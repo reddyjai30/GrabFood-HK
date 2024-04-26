@@ -56,7 +56,7 @@ app.use('/api', uploadRoutes);
 
 
 //search
-app.use('/api/menu', searchRoutes);
+app.use('/api/search', searchRoutes);
 
 // Listen on the defined PORT or default to 3000
 const PORT = process.env.PORT || 3000;
