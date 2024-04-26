@@ -2,11 +2,11 @@ const User = require('../model/userModel');
 const jwt = require('jsonwebtoken');
 const jwtSecret = process.env.JWT_SECRET;
 // Ensure to replace hardcoded credentials with environment variables in production
-const client = require('twilio')('ACb664710c355ea144fc5ffa2aaecfc70f', 'c28625fd5469110df1e0aabc94694207');
+const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // Manually setting the Verify Service SID for debugging purposes
 // Replace 'VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' with your actual TWILIO_VERIFY_SID
-const verifySid = 'VA4035590dd22d40d181c4df49fb95a29b';
+const verifySid = process.env.TWILIO_VERIFY_SID;
 
 // Send OTP to the provided phone number using Twilio Verify
 exports.sendOTP = async (phoneNo) => {

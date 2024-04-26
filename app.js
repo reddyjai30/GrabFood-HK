@@ -31,7 +31,7 @@ app.use(cookieParser()); // For parsing cookies
 
 // Connect to MongoDB
 //'mongodb+srv://reddyjaiaws30:O8LrcULswGaslfSy@cluster0.bxv3zjk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'
-mongoose.connect('mongodb://localhost:27017/grabFoodDB', {
+mongoose.connect('mongodb+srv://reddyjaiaws30:O8LrcULswGaslfSy@cluster0.bxv3zjk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
