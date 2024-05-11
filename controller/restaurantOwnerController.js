@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const RestaurantOwner = require('../model/restaurantOwnerModel');
 const Restaurant = require('../model/restaurantModel');
 const upload = require('../middleware/uploadMiddleware'); 
+const AdminSettings = require('../model/AdminSettings')
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
@@ -179,3 +180,27 @@ exports.ownerLogin = async (req, res) => {
       res.status(500).json({ message: 'Server error', error: error.message });
     }
   };
+
+
+// Assuming you have a route that handles this logic
+exports.getRestaurantsWithinRadius = async (req, res) => {
+  const { latitude, longitude } = req.query; // coordinates from which to calculate the distance
+  const adminSettings = await AdminSettings.findOne(); // Retrieve settings
+
+  try {
+    const radius = adminSettings.restaurantRadius || 5; // Default radius to 5 km if not specified
+    const restaurants = await Restaurant.find({
+      status: 'approved', // Only fetch approved restaurants
+      location: {
+        $geoWithin: {
+          $centerSphere: [[longitude, latitude], radius / 6378.1] // Convert radius to radians for $centerSphere
+        }
+      }
+    });
+
+    res.status(200).json(restaurants);
+  } catch (error) {
+    console.error('Error finding restaurants within radius:', error);
+    res.status(500).json({ message: "Failed to retrieve restaurants", error: error.message });
+  }
+};

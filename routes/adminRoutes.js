@@ -4,6 +4,8 @@ const router = express.Router();
 // Assuming the controllers are correctly exported and imported
 const adminController = require('../controller/adminController');
 const adminAuthController = require('../controller/adminAuthController');
+const restaurantOwnerController = require('../controller/restaurantOwnerController')
+
 
 const { authMiddleware, isAdmin } = require("../middleware/authMiddleware");
 
@@ -42,5 +44,16 @@ router.post('/register-owner', authMiddleware, isAdmin, adminController.register
 router.get('/pending-restaurants', authMiddleware, isAdmin, adminController.listPendingRestaurants);
 router.put('/approve-restaurant/:id', authMiddleware, isAdmin, adminController.approveRestaurant);
 router.put('/reject-restaurant/:id', authMiddleware, isAdmin, adminController.rejectRestaurant);
+
+
+// Endpoint to disable a restaurant
+router.put('/disable-restaurant/:restaurantId', authMiddleware, isAdmin, adminController.disableRestaurant);
+
+
+
+
+// // New endpoint to get restaurants within a radius
+// router.get('/restaurants/radius', authMiddleware, restaurantOwnerController.getRestaurantsWithinRadius);
+
 
 module.exports = router;

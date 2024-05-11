@@ -9,15 +9,16 @@ const crypto = require('crypto');
 
 //admin settings
 exports.setAdminSettings = async (req, res) => {
-  const { distanceLimitKm, extraChargePerKm } = req.body;
+  const { distanceLimitKm, extraChargePerKm, restaurantRadius } = req.body;  // Include restaurantRadius in the destructuring
   try {
-    const settings = new AdminSettings({ distanceLimitKm, extraChargePerKm });
+    const settings = new AdminSettings({ distanceLimitKm, extraChargePerKm, restaurantRadius });  // Pass restaurantRadius to the settings
     await settings.save();
     res.status(201).json({ message: 'Settings updated successfully', settings });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update settings', error: error.message });
   }
 };
+
 
 
 function hashPassword(password) {
@@ -205,3 +206,25 @@ exports.rejectRestaurant = async (req, res) => {
       res.status(500).json({ message: "Error rejecting restaurant.", error: error.message });
     }
   };
+
+
+
+// Function to disable a restaurant
+exports.disableRestaurant = async (req, res) => {
+  const { restaurantId } = req.params; // ID of the restaurant to disable
+  try {
+      const restaurant = await Restaurant.findById(restaurantId);
+      if (!restaurant) {
+          return res.status(404).json({ message: "Restaurant not found." });
+      }
+      if (restaurant.status !== 'approved') {
+          return res.status(400).json({ message: "Restaurant is not in an approved state." });
+      }
+      restaurant.status = 'pending';
+      await restaurant.save();
+      res.status(200).json({ message: "Restaurant has been disabled and set to pending.", restaurant });
+  } catch (error) {
+      console.error('Error disabling the restaurant:', error);
+      res.status(500).json({ message: "Failed to disable restaurant", error: error.message });
+  }
+};

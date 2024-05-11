@@ -22,4 +22,8 @@ router.put('/restaurants/:restaurantId/menu-items/:menuItemId', ownerAuthMiddlew
 // Delete a restaurant owned by the restaurant owner
 router.delete('/restaurants/:id', ownerAuthMiddleware, restaurantOwnerController.deleteRestaurant);
 
+// New endpoint to get restaurants within a radius
+router.get('/restaurants/radius', ownerAuthMiddleware, restaurantOwnerController.getRestaurantsWithinRadius);
+
+
 module.exports = router;

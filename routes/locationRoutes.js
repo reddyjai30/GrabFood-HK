@@ -6,6 +6,9 @@ const { authMiddleware } = require('../middleware/authMiddleware'); // Assuming 
 router.post('/save-location',  locationController.saveLocation);
 
 // New route to calculate distance
-router.post('/calculate-distance', locationController.calculateDistance);
+router.post('/calculate-distance', authMiddleware, locationController.calculateDistance);
+
+router.post('/calculate-distance-charges', authMiddleware, locationController.calculateDistanceAndCharges);
+
 
 module.exports = router;

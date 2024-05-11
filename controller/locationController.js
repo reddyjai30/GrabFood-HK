@@ -1,6 +1,9 @@
 const { Client } = require('@googlemaps/google-maps-services-js');
 const jwt = require('jsonwebtoken');
 const Location = require('../model/Location'); // Adjusted to the likely correct path
+const AdminSettings = require('../model/AdminSettings');
+const ChargeRecord = require('../model/ChargeRecord'); // Make sure this model is set up correctly
+
 
 exports.saveLocation = async (req, res) => {
     // Attempt to get the token from the Authorization header
@@ -48,8 +51,7 @@ exports.calculateDistance = async (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Get the token part after "Bearer"
 
-
-    const { newLatitude, newLongitude } = req.body;
+    const { originLatitude, originLongitude, destinationLatitude, destinationLongitude } = req.body;
     const client = new Client({});
 
     try {
@@ -57,17 +59,11 @@ exports.calculateDistance = async (req, res) => {
             return res.status(401).json({ message: "Authentication token is required." });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.id;
-
-        const savedLocation = await Location.findOne({ userId: userId }).sort({ updatedAt: -1 });
-        if (!savedLocation) {
-            return res.status(404).json({ message: "No saved location found for this user." });
-        }
+        jwt.verify(token, process.env.JWT_SECRET); // This just verifies the token but does not use the decoded data
 
         const params = {
-            origins: [{ latitude: savedLocation.latitude, longitude: savedLocation.longitude }],
-            destinations: [{ latitude: newLatitude, longitude: newLongitude }],
+            origins: [{ latitude: originLatitude, longitude: originLongitude }],
+            destinations: [{ latitude: destinationLatitude, longitude: destinationLongitude }],
             key: process.env.GOOGLE_MAPS_API_KEY, // Ensure your API key is stored in environment variables
             mode: "driving"
         };
@@ -82,6 +78,70 @@ exports.calculateDistance = async (req, res) => {
         res.json({ distance, duration });
     } catch (error) {
         console.error("Error calculating distance:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+
+
+exports.calculateDistanceAndCharges = async (req, res) => {
+    const { originLatitude, originLongitude, destinationLatitude, destinationLongitude } = req.body;
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+    const client = new Client({});
+
+    try {
+        if (!token) {
+            return res.status(401).json({ message: "Authentication token is required." });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+
+        const params = {
+            origins: [{ latitude: originLatitude, longitude: originLongitude }],
+            destinations: [{ latitude: destinationLatitude, longitude: destinationLongitude }],
+            key: process.env.GOOGLE_MAPS_API_KEY,
+            mode: "driving"
+        };
+
+        const distanceResponse = await client.distancematrix({ params });
+        const distance = parseFloat(distanceResponse.data.rows[0].elements[0].distance.text.replace(' km', ''));
+
+        const settings = await AdminSettings.findOne();
+        if (!settings) {
+            return res.status(404).json({ message: "Admin settings not found." });
+        }
+
+        let limitStatus = 'Within Limit';
+        let extraCharge = 0;
+
+        if (distance > settings.distanceLimitKm) {
+            limitStatus = 'Off Limit';
+            extraCharge = (distance - settings.distanceLimitKm) * settings.extraChargePerKm;
+        }
+
+        const newRecord = new ChargeRecord({
+            
+            userId,
+            distance,
+            limitStatus,
+            extraCharge
+        });
+
+        await newRecord.save();
+
+        res.json({
+            message: "Distance and charges calculated successfully",
+            data: {
+                distance: `${distance} km`,
+                limitStatus,
+                extraCharge
+            }
+        });
+    } catch (error) {
+        console.error("Error calculating distance and charges:", error);
         res.status(500).json({ error: error.message });
     }
 };

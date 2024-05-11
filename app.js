@@ -8,11 +8,12 @@ const adminRoutes = require('./routes/adminRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const authMiddleware = require('./middleware/authMiddleware');
 const restaurantOwnerRoutes = require('./routes/restaurantOwnerRoutes');
-const orderRoutes = require('./routes/orderRoutes'); // Ensure this path is correct
 const locationRoutes = require('./routes/locationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const chargeRoutes = require('./routes/chargeRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+
 const cors = require('cors');
 
 
@@ -31,7 +32,7 @@ app.use(cookieParser()); // For parsing cookies
 
 // Connect to MongoDB
 //'mongodb+srv://reddyjaiaws30:O8LrcULswGaslfSy@cluster0.bxv3zjk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'
-mongoose.connect('mongodb+srv://reddyjaiaws30:O8LrcULswGaslfSy@cluster0.bxv3zjk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
+mongoose.connect('mongodb://localhost:27017/grabFoodDB', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -54,10 +55,15 @@ app.use('/api/charges', chargeRoutes);
 app.use(express.json());
 app.use('/api', uploadRoutes);
 
-
+app.use('/api/admin', adminRoutes);
 //search
 app.use('/api/search', searchRoutes);
 
+app.use('/api/restaurants', restaurantOwnerRoutes);
+
+app.use('/api/payments', orderRoutes);
+
+//app.use('/api/order', orderRoutes);
 // Listen on the defined PORT or default to 3000
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
