@@ -13,8 +13,15 @@ const locationSchema = new mongoose.Schema({
     longitude: {
         type: Number,
         required: true
+    },
+    houseNumber: String,  // Optional house number
+    apartmentName: String,  // Optional apartment name
+    directions: String,  // Optional directions to reach the location
+    category: {
+        type: String,
+        enum: ['Home', 'Work', 'Other'],  // Categorization of the address
+        required: true
     }
 }, { timestamps: true });
-
 
 module.exports = mongoose.model('Location', locationSchema);

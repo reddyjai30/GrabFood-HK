@@ -11,6 +11,8 @@ exports.calculateTotalAndInitiatePayment = async (req, res) => {
     let GST = itemTotal * 0.10; // 10% GST
     let CGST = itemTotal * 0.05; // 5% CGST
     let grandTotal = itemTotal + GST + CGST + extraCharges;
+    let netTotal = itemTotal  + grandTotal + CGST ;
+
 
     // Create a Stripe payment intent
     const paymentIntent = await stripe.paymentIntents.create({

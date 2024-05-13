@@ -4,44 +4,41 @@ const Location = require('../model/Location'); // Adjusted to the likely correct
 const AdminSettings = require('../model/AdminSettings');
 const ChargeRecord = require('../model/ChargeRecord'); // Make sure this model is set up correctly
 
-
 exports.saveLocation = async (req, res) => {
-    // Attempt to get the token from the Authorization header
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Get the token part after "Bearer"
-    //const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2MjExOWUwMWM4NWJhYmNmOWY0ZTExMCIsImlhdCI6MTcxMzUxODM5NCwiZXhwIjoxNzE0MTIzMTk0fQ.foNXhESzIVLtLDGsss48fd-6DhULRohdI1n99cmT-tI" ; //localStorage.getItem('token'); // Retrieve token from localStorage
+    const token = authHeader && authHeader.split(' ')[1];
 
-
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, houseNumber, apartmentName, directions, category } = req.body;
 
     try {
         if (!token) {
             return res.status(401).json({ message: "Authentication token is required." });
         }
 
-        // Verify and decode the JWT token using the secret key
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Use an environment variable for the JWT secret
-        const userId = decoded.id; // Extract user ID from token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
 
-        // Create and save the location
         const location = new Location({
-            userId: userId, // Store the user ID from the token
+            userId: userId,
             latitude: latitude,
-            longitude: longitude
+            longitude: longitude,
+            houseNumber: houseNumber,
+            apartmentName: apartmentName,
+            directions: directions,
+            category: category
         });
 
         await location.save();
         res.status(201).json({ message: "Location saved successfully", location });
     } catch (error) {
         if (error.name === "JsonWebTokenError") {
-            // Handle JSON Web Token errors
             return res.status(403).json({ message: "Invalid token." });
         }
-        // Generic error handling
         console.error("Error saving location:", error);
         res.status(500).json({ error: error.message });
     }
 };
+
 
 
 
