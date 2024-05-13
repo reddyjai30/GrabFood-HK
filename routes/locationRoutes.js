@@ -10,5 +10,8 @@ router.post('/calculate-distance', authMiddleware, locationController.calculateD
 
 router.post('/calculate-distance-charges', authMiddleware, locationController.calculateDistanceAndCharges);
 
+router.get('/get-user-location', authMiddleware, locationController.getUserLocation);
+
+
 
 module.exports = router;

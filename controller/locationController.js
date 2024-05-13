@@ -142,3 +142,26 @@ exports.calculateDistanceAndCharges = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+
+exports.getUserLocation = async (req, res) => {
+    const token = req.headers.authorization.split(' ')[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+
+        const location = await Location.findOne({ userId: userId });
+        if (!location) {
+            return res.status(404).json({ message: "No location found for this user." });
+        }
+
+        res.json({ message: "Location retrieved successfully", location });
+    } catch (error) {
+        if (error.name === "JsonWebTokenError") {
+            return res.status(403).json({ message: "Invalid token." });
+        }
+        console.error("Error retrieving location:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
