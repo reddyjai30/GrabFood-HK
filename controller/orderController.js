@@ -1,6 +1,10 @@
 const Order = require('../model/Order');
 const stripe = require('../config/stripeConfig');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
+const CryptoJS = require('crypto-js');
+
+
 
 
 const checkPaymentStatusPeriodically = (sessionId, metadata) => {
@@ -22,6 +26,7 @@ const checkPaymentStatusPeriodically = (sessionId, metadata) => {
           let GST = itemTotal * 0.10; // 10% GST
           let CGST = itemTotal * 0.05; // 5% CGST
           let grandTotal = itemTotal + GST + CGST + parseFloat(extraCharges);
+          let totalQuantity = itemsArray.reduce((acc, item) => acc + item.quantity, 0); // Calculate total quantity
 
           // Save the order details in the database
           const newOrder = new Order({
@@ -32,8 +37,8 @@ const checkPaymentStatusPeriodically = (sessionId, metadata) => {
             total: itemTotal,
             GST,
             CGST,
-            grandTotal,
             extraCharges: parseFloat(extraCharges),
+            grandTotal,
             status: 'Paid',
             paymentConfirmed: true,
             paymentIntentId: session.payment_intent
@@ -41,14 +46,128 @@ const checkPaymentStatusPeriodically = (sessionId, metadata) => {
 
           await newOrder.save();
           console.log('Payment succeeded and order saved:', newOrder._id);
-          resolve({ message: "Payment successful and order saved.", orderId: newOrder._id });
+
+          // Call Lalamove Quotation API
+          const lalamoveApiKey = 'pk_test_17d72ce20ccd65cde241e2da9b07d8c1';
+          const lalamoveSecret = 'sk_test_ZOnyEK2o6dF2j31lF2KcEY/PdyD7FyWDNhoT71lkEqKloq6hrnATroxedNhiuxui'; // Replace with your Lalamove secret
+          const market = 'HK';
+          const timestamp = new Date().getTime();
+
+          const lalamoveBody = {
+            "data": {
+              "serviceType": "MOTORCYCLE",
+              "specialRequests": ["PURCHASE_SERVICE_1"],
+              "language": "en_HK",
+              "stops": [
+                {
+                  "coordinates": {
+                    "lat": "22.33547351186244",
+                    "lng": "114.17615807116502"
+                  },
+                  "address": "test1 location1"
+                },
+                {
+                  "coordinates": {
+                    "lat": "22.29553167157697",
+                    "lng": "114.16885175766998"
+                  },
+                  "address": "test1 location2"
+                }
+              ],
+              "isRouteOptimized": true,
+              "item": {
+                "quantity": totalQuantity.toString(),
+                "weight": "LESS_THAN_3_KG",
+                "categories": [
+                  "FOOD_DELIVERY",
+                  "OFFICE_ITEM"
+                ],
+                "handlingInstructions": [
+                  "KEEP_UPRIGHT"
+                ]
+              },
+            }
+          };
+
+          const bodyString = JSON.stringify(lalamoveBody);
+          console.log('Lalamove Quotation Body:', bodyString); // Log the body for debugging
+          const signature = CryptoJS.HmacSHA256(`${timestamp}\r\nPOST\r\n/v3/quotations\r\n\r\n${bodyString}`, lalamoveSecret);
+
+          const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `hmac ${lalamoveApiKey}:${timestamp}:${signature}`,
+            'Market': market
+          };
+
+          try {
+            const response = await axios.post('https://rest.sandbox.lalamove.com/v3/quotations', lalamoveBody, { headers });
+            const quotationId = response.data.data.quotationId;
+            const stops = response.data.data.stops; // Get stops from the quotation response
+            console.log('Lalamove Quotation API response:', response.data);
+
+            // Call Lalamove Place Order API
+            const placeOrderBody = {
+              "data": {
+                "quotationId": quotationId,
+                "sender": {
+                  "stopId": stops[0].stopId, // Use the stopId from the stops array
+                  "name": "Michal",
+                  "phone": "+85238485765"
+                },
+                "recipients": [
+                  {
+                    "stopId": stops[1].stopId, // Use the stopId from the stops array
+                    "name": "Katrina",
+                    "phone": "+85238485696",
+                    "remarks": "YYYYYY" // optional
+                  }
+                ],
+                "isPODEnabled": true, // optional
+                "partner": "Lalamove Partner 1" // optional 
+              }
+            };
+
+            const placeOrderBodyString = JSON.stringify(placeOrderBody);
+            console.log('Lalamove Place Order Body:', placeOrderBodyString); // Log the body for debugging
+            const placeOrderSignature = CryptoJS.HmacSHA256(`${timestamp}\r\nPOST\r\n/v3/orders\r\n\r\n${placeOrderBodyString}`, lalamoveSecret);
+
+            const placeOrderHeaders = {
+              'Content-Type': 'application/json',
+              'Authorization': `hmac ${lalamoveApiKey}:${timestamp}:${placeOrderSignature}`,
+              'Market': market
+            };
+
+            try {
+              const placeOrderResponse = await axios.post('https://rest.sandbox.lalamove.com/v3/orders', placeOrderBody, { headers: placeOrderHeaders });
+              console.log('Lalamove Place Order API response:', placeOrderResponse.data);
+
+              // Update the order in the database with Lalamove order details
+              newOrder.lalamoveOrderId = placeOrderResponse.data.data.orderId;
+              newOrder.quotationId = placeOrderResponse.data.data.quotationId;
+              newOrder.priceBreakdown = placeOrderResponse.data.data.priceBreakdown;
+              newOrder.driverId = placeOrderResponse.data.data.driverId;
+              newOrder.shareLink = placeOrderResponse.data.data.shareLink;
+              newOrder.lalamoveStatus = placeOrderResponse.data.data.status;
+              
+              await newOrder.save();
+              console.log('Lalamove order details saved:', newOrder._id);
+
+              resolve({ message: "Payment successful, order saved, and Lalamove order placed.", orderId: newOrder._id });
+            } catch (placeOrderError) {
+              console.error('Error calling Lalamove Place Order API:', placeOrderError.response?.data || placeOrderError.message);
+              reject(placeOrderError);
+            }
+          } catch (error) {
+            console.error('Error calling Lalamove Quotation API:', error.response?.data || error.message);
+            reject(error);
+          }
         }
       } catch (error) {
         console.error(`Error retrieving session ${sessionId}:`, error);
         clearInterval(interval);
         reject(error);
       }
-    }, 5000); // Check every 1 second
+    }, 5000); // Check every 5 second
   });
 };
 
@@ -109,8 +228,8 @@ exports.calculateTotalAndInitiatePayment = async (req, res) => {
         total: itemTotal,
         GST,
         CGST,
-        grandTotal,
-        extraCharges // Add extraCharges to the response
+        extraCharges, // Include extraCharges in the response
+        grandTotal
       }
     });
 
