@@ -14,6 +14,11 @@ const chargeRoutes = require('./routes/chargeRoutes');
 const searchRoutes = require('./routes/searchRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 
+const stripe = require('./config/stripeConfig');
+
+const bodyParser = require('body-parser');
+const paymentRoutes = require('./routes/paymentRoutes');
+
 const cors = require('cors');
 
 
@@ -26,7 +31,7 @@ const app = express();
 app.use(cors());
 
 // Middlewares
-app.use(express.json()); // For parsing application/json
+//app.use(express.json()); // For parsing application/json
 app.use(cookieParser()); // For parsing cookies
 
 
@@ -39,6 +44,11 @@ mongoose.connect('mongodb://localhost:27017/grabFoodDB', {
 .then(() => console.log('MongoDB Connected'))
 .catch(err => console.error(err));
 
+
+
+
+
+app.use(express.json());
 // Define routes
 app.use('/api/auth', authRoutes); // Authentication routes
 app.use('/api/profile', profileRoutes); // Profile management routes
@@ -52,7 +62,7 @@ app.use('/api/location', locationRoutes);
 // Use the routes in your Express application
 app.use('/api/charges', chargeRoutes);
 
-app.use(express.json());
+//app.use(express.json());
 app.use('/api', uploadRoutes);
 
 app.use('/api/admin', adminRoutes);
@@ -61,8 +71,14 @@ app.use('/api/search', searchRoutes);
 
 app.use('/api/restaurants', restaurantOwnerRoutes);
 
-app.use('/api/payments', orderRoutes);
+app.use('/api/payments', paymentRoutes);
 
+
+
+
+
+
+//app.use('/api/webhooks', webhookRoutes);
 //app.use('/api/order', orderRoutes);
 // Listen on the defined PORT or default to 3000
 const PORT = process.env.PORT || 3000;

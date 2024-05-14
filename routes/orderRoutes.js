@@ -8,8 +8,8 @@ const { authMiddleware } = require('../middleware/authMiddleware'); // Assuming 
 //router.post('/calculate-total', orderController.calculateTotal);
 router.post('/order', orderController.calculateTotalAndInitiatePayment);
 
-router.post('/process-payment', authMiddleware, orderController.processPaymentAndStoreOrder);
+//router.post('/process-payment', authMiddleware, orderController.processPaymentAndStoreOrder);
 
-router.post('/create-payment-intent', orderController.createpaymentintent);
+//router.post('/create-payment-intent', orderController.createpaymentintent);
 
 module.exports = router;

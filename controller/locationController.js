@@ -151,17 +151,17 @@ exports.getUserLocation = async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.id;
 
-        const location = await Location.findOne({ userId: userId });
-        if (!location) {
-            return res.status(404).json({ message: "No location found for this user." });
+        const locations = await Location.find({ userId: userId });
+        if (!locations || locations.length === 0) {
+            return res.status(404).json({ message: "No locations found for this user." });
         }
 
-        res.json({ message: "Location retrieved successfully", location });
+        res.json({ message: "Locations retrieved successfully", locations });
     } catch (error) {
         if (error.name === "JsonWebTokenError") {
             return res.status(403).json({ message: "Invalid token." });
         }
-        console.error("Error retrieving location:", error);
+        console.error("Error retrieving locations:", error);
         res.status(500).json({ error: error.message });
     }
 };

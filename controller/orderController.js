@@ -1,125 +1,128 @@
-// const Order = require('../model/Order');
-// const stripe = require('../config/stripeConfig'); // Make sure you have configured Stripe
+const Order = require('../model/Order');
+const stripe = require('../config/stripeConfig');
+const jwt = require('jsonwebtoken');
 
-// Function to calculate total and initiate payment
+
+const checkPaymentStatusPeriodically = (sessionId, metadata) => {
+  return new Promise((resolve, reject) => {
+    const interval = setInterval(async () => {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        console.log(`Checking payment status for session ${sessionId}: ${session.payment_status}`);
+
+        if (session.payment_status === 'paid') {
+          clearInterval(interval);
+          const { userId, restaurantOwnerId, restaurantId, items, extraCharges } = metadata;
+
+          // Parse items back to array
+          const itemsArray = JSON.parse(items);
+
+          // Calculate totals again if needed
+          let itemTotal = itemsArray.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+          let GST = itemTotal * 0.10; // 10% GST
+          let CGST = itemTotal * 0.05; // 5% CGST
+          let grandTotal = itemTotal + GST + CGST + parseFloat(extraCharges);
+
+          // Save the order details in the database
+          const newOrder = new Order({
+            userId,
+            restaurantOwnerId,
+            restaurantId,
+            items: itemsArray,
+            total: itemTotal,
+            GST,
+            CGST,
+            grandTotal,
+            extraCharges: parseFloat(extraCharges),
+            status: 'Paid',
+            paymentConfirmed: true,
+            paymentIntentId: session.payment_intent
+          });
+
+          await newOrder.save();
+          console.log('Payment succeeded and order saved:', newOrder._id);
+          resolve({ message: "Payment successful and order saved.", orderId: newOrder._id });
+        }
+      } catch (error) {
+        console.error(`Error retrieving session ${sessionId}:`, error);
+        clearInterval(interval);
+        reject(error);
+      }
+    }, 5000); // Check every 1 second
+  });
+};
+
 exports.calculateTotalAndInitiatePayment = async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
   try {
-    const { items, userId, restaurantOwnerId, restaurantId, extraCharges } = req.body;
-    
+    const { items, restaurantOwnerId, restaurantId, extraCharges } = req.body;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
     // Calculate totals
     let itemTotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     let GST = itemTotal * 0.10; // 10% GST
     let CGST = itemTotal * 0.05; // 5% CGST
     let grandTotal = itemTotal + GST + CGST + extraCharges;
-    let netTotal = itemTotal  + grandTotal + CGST ;
 
+    // Create a Stripe Checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: items.map(item => {
+        let totalItemPrice = item.price * item.quantity;
+        let itemGST = totalItemPrice * 0.10;
+        let itemCGST = totalItemPrice * 0.05;
+        let itemExtraCharge = (totalItemPrice / itemTotal) * extraCharges;
+        let finalItemPrice = totalItemPrice + itemGST + itemCGST + itemExtraCharge;
 
-    // Create a Stripe payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(grandTotal * 100), // Stripe requires the amount in cents
-      currency: 'usd',
+        return {
+          price_data: {
+            currency: 'inr',
+            product_data: {
+              name: item.name,
+            },
+            unit_amount: Math.round(finalItemPrice * 100),
+          },
+          quantity: 1,
+        };
+      }),
+      mode: "payment",
+      success_url: `${process.env.CLIENT_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL}/cancel.html`,
       metadata: {
-        orderFor: restaurantId,
-        orderedBy: userId,
-        restaurantOwner: restaurantOwnerId
+        userId: userId,
+        restaurantOwnerId: restaurantOwnerId,
+        restaurantId: restaurantId,
+        items: JSON.stringify(items),
+        extraCharges: extraCharges.toString()
       }
     });
 
-    // Save the order details in the database
-    const newOrder = new Order({
-      userId,
-      restaurantOwnerId,
-      restaurantId,
-      items,
-      total: itemTotal,
-      GST,
-      CGST,
-      grandTotal
-    });
-
-    await newOrder.save();
-
-    res.status(201).json({
-      message: "Total calculated and payment initiated successfully",
-      clientSecret: paymentIntent.client_secret,
+    // Respond immediately with session details
+    res.json({
+      message: "Checkout session created successfully",
+      sessionId: session.id,
+      url: session.url,
       orderDetails: {
         total: itemTotal,
         GST,
         CGST,
-        grandTotal
+        grandTotal,
+        extraCharges // Add extraCharges to the response
       }
     });
-  } catch (error) {
-    console.error('Error processing payment or saving order:', error);
-    res.status(500).json({ message: 'Failed to process payment and save order', error: error.message });
-  }
-};
 
-
-const Order = require('../model/Order');
-const stripe = require('../config/stripeConfig');
-
-exports.processPaymentAndStoreOrder = async (req, res) => {
-  const { paymentIntentId, userId, restaurantId, items, total, GST, CGST, grandTotal } = req.body;
-
-  try {
-    // Attempt to confirm the payment intent
-    const paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId);
-
-    if (paymentIntent.status === 'succeeded') {
-      // Create and save the order in the database after successful payment
-      const newOrder = new Order({
-        userId,
-        restaurantId,
-        items,
-        total,
-        GST,
-        CGST,
-        grandTotal,
-        paymentStatus: 'Paid'
-      });
-
-      await newOrder.save();
-
-      // Optionally, generate an invoice here or send a confirmation email
-
-      res.status(201).json({
-        message: 'Payment successful and order stored',
-        orderDetails: {
-          total,
-          GST,
-          CGST,
-          grandTotal
-        }
-      });
-    } else {
-      res.status(400).json({ message: 'Payment failed' });
+    // Start checking payment status periodically after responding
+    try {
+      const result = await checkPaymentStatusPeriodically(session.id, session.metadata);
+      console.log(result);
+    } catch (error) {
+      console.error(error);
     }
   } catch (error) {
-    console.error('Payment or database error:', error);
-    res.status(500).json({ message: 'Failed to process payment and store order', error: error.message });
-  }
-};
-
-
-exports.createpaymentintent = async (req, res) => {
-  const { amount, restaurantId, userId, menuItemId, menuItemName } = req.body;
-
-  try {
-      // Convert amount to cents for Stripe processing
-      const paymentIntent = await stripe.paymentIntents.create({
-          amount: amount * 100, // Assuming amount is in dollars for simplicity
-          currency: 'usd',
-          metadata: { restaurantId, userId, menuItemId, menuItemName },
-          automatic_payment_methods: {
-            enabled: true,
-            allow_redirects: 'never'  // Ensure that no redirect-based payment methods are used
-          }
-      });
-
-      res.status(201).json({ clientSecret: paymentIntent.client_secret });
-  } catch (error) {
-      console.error('Payment Intent API error:', error);
-      res.status(500).json({ error: error.message });
+    console.error('Error initiating Stripe Checkout session:', error);
+    res.status(500).json({ message: 'Failed to initiate payment', error: error.message });
   }
 };
