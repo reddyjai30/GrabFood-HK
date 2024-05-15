@@ -48,8 +48,8 @@ const checkPaymentStatusPeriodically = (sessionId, metadata) => {
           console.log('Payment succeeded and order saved:', newOrder._id);
 
           // Call Lalamove Quotation API
-          const lalamoveApiKey = 'pk_test_17d72ce20ccd65cde241e2da9b07d8c1';
-          const lalamoveSecret = 'sk_test_ZOnyEK2o6dF2j31lF2KcEY/PdyD7FyWDNhoT71lkEqKloq6hrnATroxedNhiuxui'; // Replace with your Lalamove secret
+          const lalamoveApiKey = process.env.LALAMOVE_API_KEY;
+          const lalamoveSecret = process.env.LALAMOVE_SECRET; 
           const market = 'HK';
           const timestamp = new Date().getTime();
 
