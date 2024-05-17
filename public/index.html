@@ -1,0 +1,106 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Status</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Payment Status</h1>
+  <p id="status"> for payment status...</p>
+  <div id="details"></div>
+  <script>
+    const socket = io();
+    const statusElement = document.getElementById('status');
+    const detailsElement = document.getElementById('details');
+
+    socket.on('connect', () => {
+      console.log('Connected to socket server');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from socket server');
+    });
+
+    socket.on('payment_status', (data) => {
+      statusElement.textContent = data.message;
+      if (data.status === 'paid') {
+        socket.disconnect(); // Disconnect the socket when payment is completed
+      }
+    });
+
+    socket.on('order_details', (data) => {
+      const orderDetails = data.orderDetails;
+      const orderDetailsHtml = `
+        <h2>Order Details</h2>
+        <p>Order ID: ${orderDetails._id}</p>
+        <p>Total: ${orderDetails.total}</p>
+        <p>GST: ${orderDetails.GST}</p>
+        <p>CGST: ${orderDetails.CGST}</p>
+        <p>Grand Total: ${orderDetails.grandTotal}</p>
+        <p>Extra Charges: ${orderDetails.extraCharges}</p>
+        <p>Lalamove Order ID: ${orderDetails.lalamoveOrderId}</p>
+        <p>Quotation ID: ${orderDetails.quotationId}</p>
+        <p>Driver ID: ${orderDetails.driverId}</p>
+        <p>Lalamove Status: ${orderDetails.lalamoveStatus}</p>
+        <p>Share Link: <a href="${orderDetails.shareLink}" target="_blank">Track Delivery</a></p>
+      `;
+      detailsElement.innerHTML = orderDetailsHtml;
+    });
+  </script>
+</body>
+</html> -->
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Status</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Payment Status</h1>
+  <p id="status">Waiting for payment status...</p>
+  <div id="details"></div>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('userId'); // Get userId from query params
+
+    const socket = io();
+    const statusElement = document.getElementById('status');
+    const detailsElement = document.getElementById('details');
+
+    socket.emit('join_room', userId);
+
+    socket.on('payment_status', (data) => {
+      statusElement.textContent = data.message;
+      if (data.status === 'paid') {
+        socket.disconnect(); // Disconnect the socket when payment is completed
+      }
+    });
+
+    socket.on('order_details', (data) => {
+      const orderDetails = data.orderDetails;
+      const orderDetailsHtml = `
+        <h2>Order Details</h2>
+        <p>Order ID: ${orderDetails._id}</p>
+        <p>Total: ${orderDetails.total}</p>
+        <p>GST: ${orderDetails.GST}</p>
+        <p>CGST: ${orderDetails.CGST}</p>
+        <p>Grand Total: ${orderDetails.grandTotal}</p>
+        <p>Extra Charges: ${orderDetails.extraCharges}</p>
+        <p>Lalamove Order ID: ${orderDetails.lalamoveOrderId}</p>
+        <p>Quotation ID: ${orderDetails.quotationId}</p>
+        <p>Driver ID: ${orderDetails.driverId}</p>
+        <p>Lalamove Status: ${orderDetails.lalamoveStatus}</p>
+        <p>Share Link: <a href="${orderDetails.shareLink}" target="_blank">Track Delivery</a></p>
+      `;
+      detailsElement.innerHTML = orderDetailsHtml;
+    });
+  </script>
+</body>
+</html>
